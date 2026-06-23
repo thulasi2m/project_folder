@@ -1,0 +1,46 @@
+:root{
+  --bg:#f7fbf9;
+  --panel:#ffffff;
+  --accent:#1fa64a;
+  --accent-600:#16913d;
+  --muted:#6b7280;
+  --danger:#e74c3c;
+  --radius:8px;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:#111}
+.container{max-width:1200px;margin:18px auto;padding:12px}
+.topbar{display:flex;justify-content:space-between;align-items:center;background:transparent;padding:6px 10px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{border-radius:6px}
+.title{font-size:20px;font-weight:700;color:#0f172a}
+.actions{display:flex;gap:12px;align-items:center}
+.btn{display:inline-flex;gap:8px;align-items:center;padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:600}
+.btn.excel{background:#1fa64a;color:#fff;box-shadow:0 2px 0 rgba(0,0,0,.06)}
+.btn.pdf{background:#1fa64a;color:#fff}
+.btn.analyze{background:#1766d1;color:#fff;padding:10px 18px;border-radius:10px}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.refresh{background:linear-gradient(180deg,#2bb673,#158a48);color:#fff;border-radius:22px;padding:8px 12px}
+.filters{margin-top:14px;padding:14px;border-radius:12px;background:transparent}
+.filter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.filter-card{background:var(--panel);padding:12px;border-radius:12px;box-shadow:0 1px 3px rgba(16,24,40,.05)}
+.lbl{display:block;font-size:13px;color:var(--muted);margin-bottom:8px;font-weight:600}
+.control{display:flex;align-items:center;gap:8px}
+.control input[type=date],.control select{flex:1;padding:10px;border-radius:8px;border:1px solid #e6eef0;background:#fff}
+.date-control .icon{margin-right:6px}
+.time-boxes{display:inline-flex;gap:6px;align-items:center}
+.time-boxes input{width:44px;padding:8px;text-align:center;border-radius:8px;border:1px solid #e6eef0}
+.time-boxes span{color:var(--muted);font-weight:700}
+.table-area{margin-top:18px;background:var(--panel);min-height:320px;border-radius:12px;padding:22px;border:1px solid #eef6f1}
+.table-header{color:var(--muted);font-size:13px;margin-bottom:22px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;color:var(--muted)}
+.empty-icon{opacity:0.95;margin-bottom:12px}
+h3{margin:6px 0 4px}
+p{margin:0;color:#64748b}
+
+@media (max-width:900px){
+  .container{padding:8px}
+  .filter-row{grid-template-columns:repeat(2,1fr)}
+  .actions{flex-wrap:wrap}
+}

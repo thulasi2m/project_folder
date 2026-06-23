@@ -1,0 +1,16 @@
+<<<<<<< HEAD
+"**/dist-electron/" 
+"*.exe" 
+"*.tmp" 
+=======
+dist/  
+build/  
+dist-electron/  
+*.exe 
+dist/  
+build/  
+dist-electron/  
+*.exe 
+>>>>>>> e922f5e738e134463bcd12d0b11c93f6b05b9f86
+*.zip 
+cherry-precision-product-main.zip 

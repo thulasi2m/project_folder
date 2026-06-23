@@ -1,0 +1,29 @@
+version: 0.1
+
+component: build
+
+shell: bash
+
+timeoutInSeconds: 600
+
+steps:
+  - type: Command
+    name: "Create Artifact Properly"
+    command: |
+      echo "Starting build"
+
+      # Always use absolute safe path
+      WORK_DIR=$(pwd)
+      echo "Working dir: $WORK_DIR"
+
+      mkdir -p $WORK_DIR/output
+
+      echo "Hello OCI" > $WORK_DIR/output/result.txt
+
+      echo "Verifying output:"
+      ls -l $WORK_DIR/output
+
+outputArtifacts:
+  - name: build_output
+    type: BINARY
+    location: output
