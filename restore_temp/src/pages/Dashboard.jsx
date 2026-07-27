@@ -64,7 +64,27 @@ export default function Dashboard() {
         />
       </div>
 
-
+      {/* Consolidated Summary Column */}
+      <div className="w-full grid grid-cols-3 gap-2 mt-2">
+        <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl p-2 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+          <p className="text-[9px] text-gray-600 font-bold mb-0.5 uppercase tracking-wider text-center leading-tight">Air Gauge<br/>Accept No</p>
+          <p className="text-2xl font-black text-[#15803d]">
+            {airGauges.filter(g => g.isAccept).length}
+          </p>
+        </div>
+        <div className="bg-[#fffbeb] border border-[#fde68a] rounded-xl p-2 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+          <p className="text-[9px] text-gray-600 font-bold mb-0.5 uppercase tracking-wider text-center leading-tight">Air Gauge<br/>Rework No</p>
+          <p className="text-2xl font-black text-[#d97706]">
+            {airGauges.filter(g => g.isRework).length}
+          </p>
+        </div>
+        <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-2 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+          <p className="text-[9px] text-gray-600 font-bold mb-0.5 uppercase tracking-wider text-center leading-tight">Air Gauge<br/>Reject No</p>
+          <p className="text-2xl font-black text-[#c81e1e]">
+            {airGauges.filter(g => g.isReject).length}
+          </p>
+        </div>
+      </div>
 
       {/* Multi-Gauge List based on Architecture Diagram */}
       <div className="w-full space-y-3 pb-8 mt-2">

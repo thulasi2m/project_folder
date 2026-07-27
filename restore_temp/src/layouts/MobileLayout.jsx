@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Menu, X, Home, Settings, Activity, Usb, FileText, LogOut, BarChart2 } from 'lucide-react';
 import BottomNavigation from '../components/BottomNavigation';
@@ -7,40 +7,10 @@ import cherryLogo from '../assets/cherry_full_logo.png';
 export default function MobileLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
-  const [savedCustomer, setSavedCustomer] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const loadCustomer = () => {
-      const stored = localStorage.getItem('savedCustomer');
-      if (stored) {
-        setSavedCustomer(JSON.parse(stored));
-      } else {
-        const storedArray = localStorage.getItem('savedCustomers');
-        if (storedArray) {
-          const parsed = JSON.parse(storedArray);
-          if (parsed && parsed.length > 0) {
-            setSavedCustomer(parsed[parsed.length - 1]);
-          }
-        }
-      }
-    };
-    loadCustomer();
-    
-    // Listen for storage events (if changed in other tabs/pages)
-    window.addEventListener('storage', loadCustomer);
-    
-    // Also poll every 2 seconds just in case it's updated in the same app without triggering storage event 
-    const interval = setInterval(loadCustomer, 2000);
-    
-    return () => {
-      window.removeEventListener('storage', loadCustomer);
-      clearInterval(interval);
-    };
-  }, []);
-
   return (
-    <div className="flex flex-col fixed inset-0 w-full bg-[#e5e5e5] font-sans overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-[#e5e5e5] font-sans relative overflow-hidden">
       {/* Top Header */}
       <header className="bg-white px-4 py-2 flex items-center justify-between border-b border-gray-300 shadow-sm z-40 sticky top-0">
         <div className="flex items-center gap-1.5">
@@ -52,16 +22,6 @@ export default function MobileLayout() {
           <Menu className="w-6 h-6 text-black" />
         </button>
       </header>
-      
-      {/* Render saved customer if it exists */}
-      {savedCustomer && (
-        <div className="w-full bg-[#f8fafc] border-b border-gray-200 px-4 py-2 flex items-center justify-start gap-3 shadow-inner z-30 sticky top-[53px]">
-          {savedCustomer.customerPhoto && (
-            <img src={savedCustomer.customerPhoto} alt="Customer" className="h-8 object-contain drop-shadow-sm" />
-          )}
-          <span className="text-sm font-black tracking-wide uppercase text-[#1e293b]">{savedCustomer.customerName}</span>
-        </div>
-      )}
 
       {/* Sidebar Overlay (Absolute to stay inside wrapper) */}
       {menuOpen && (
@@ -101,9 +61,6 @@ export default function MobileLayout() {
 
               <button onClick={() => {navigate('/app/user-config'); setMenuOpen(false);}} className="flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 rounded-lg">
                 <span className="w-5 h-5 text-center text-lg leading-none">👤</span> <span className="text-[15px]">User Config</span>
-              </button>
-              <button onClick={() => {navigate('/app/customer'); setMenuOpen(false);}} className="flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 rounded-lg">
-                <span className="w-5 h-5 text-center text-lg leading-none">🏢</span> <span className="text-[15px]">Customer Setup</span>
               </button>
               <button onClick={() => {setLogoutModal(true); setMenuOpen(false);}} className="flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 rounded-lg">
                 <LogOut className="w-5 h-5 text-[#15803d]" /> <span className="text-[15px]">Logout</span>

@@ -7,7 +7,6 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [requests, setRequests] = useState([]);
   const [savedUsers, setSavedUsers] = useState([]);
-  const [savedCustomers, setSavedCustomers] = useState([]);
 
   React.useEffect(() => {
     if (authenticated) {
@@ -17,9 +16,6 @@ export default function AdminPage() {
       
       const loadedUsers = JSON.parse(localStorage.getItem('savedUsers') || '[]');
       setSavedUsers(loadedUsers);
-
-      const loadedCustomers = JSON.parse(localStorage.getItem('savedCustomers') || '[]');
-      setSavedCustomers(loadedCustomers);
     }
   }, [authenticated]);
 
@@ -97,7 +93,60 @@ export default function AdminPage() {
         <p className="text-sm text-gray-500">System settings and configurations will appear here.</p>
       </div>
 
+      <div className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mt-4">
+        <h3 className="font-bold text-gray-800 text-sm mb-3 border-b pb-2">Live Data Report Requests</h3>
+        {requests.length === 0 ? (
+          <p className="text-xs text-gray-500 text-center py-2">No requests currently.</p>
+        ) : (
+          <div className="space-y-2">
+            {requests.map((req, idx) => {
+              let cardClass = 'bg-[#fffbeb] border-[#fde68a]';
+              let badgeClass = 'bg-[#d97706]';
+              let statusText = 'WAITING';
+              
+              if (req.status === 'approved') {
+                cardClass = 'bg-[#f0fdf4] border-[#bbf7d0]';
+                badgeClass = 'bg-[#15803d]';
+                statusText = 'APPROVED';
+              } else if (req.status === 'rejected') {
+                cardClass = 'bg-[#fef2f2] border-[#fecaca]';
+                badgeClass = 'bg-[#b91c1c]';
+                statusText = 'REJECTED';
+              }
 
+              return (
+              <div key={idx} className={`border p-3 rounded-lg flex flex-col gap-2 ${cardClass}`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xs font-bold text-gray-800">Phone: +91 {req.phone}</p>
+                    <p className="text-[10px] text-gray-500">{req.date} {req.time}</p>
+                  </div>
+                  <div className={`text-white text-[10px] font-bold px-2 py-1 rounded ${badgeClass}`}>
+                    {statusText}
+                  </div>
+                </div>
+                
+                {req.status === 'waiting' && (
+                  <div className="flex gap-2 mt-1 border-t border-[#fde68a] pt-2">
+                    <button 
+                      onClick={() => updateStatus(idx, 'approved')}
+                      className="flex-1 bg-[#15803d] text-white text-[11px] font-bold py-1.5 rounded shadow-sm"
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={() => updateStatus(idx, 'rejected')}
+                      className="flex-1 bg-[#b91c1c] text-white text-[11px] font-bold py-1.5 rounded shadow-sm"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            )})}
+          </div>
+        )}
+      </div>
 
       {/* User Configurations Section */}
       <div className="w-full bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mt-4 mb-4">
@@ -131,8 +180,6 @@ export default function AdminPage() {
           </div>
         )}
       </div>
-
-
 
     </div>
   );

@@ -7,76 +7,12 @@ import { Calendar, Clock, BarChart2, MoveHorizontal, Info, Tag, Activity, FileTe
 export default function LiveMonitoring() {
   const location = useLocation();
   const [currentGauge, setCurrentGauge] = useState(location.state?.selectedGauge || "ALL");
-  const [manualEmployee, setManualEmployee] = useState('');
 
   const [erpData, setErpData] = useState(null);
   const [liveReading, setLiveReading] = useState(null);
-  const [monitoringData, setMonitoringData] = useState(() => {
-    // Generate 50 mock records
-    const statuses = ['ACCEPTED', 'ACCEPTED', 'ACCEPTED', 'REJECTED', 'REWORK'];
-    const gauges = [
-      { id: '1', gauge: 'AG01', uid: '111', name: 'aaa' },
-      { id: '2', gauge: 'AG02', uid: '222', name: 'bbb' }
-    ];
-    const mockAlerts = [];
-    const mockData = [];
-    for (let i = 0; i < 50; i++) {
-      const g = gauges[Math.floor(Math.random() * gauges.length)];
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
-      const reading = (20.015 + (Math.random() * 0.004 - 0.002)).toFixed(4);
-      const time = new Date(Date.now() - i * 60000).toLocaleTimeString();
-      
-      mockData.push({
-        id: `mock-${i}`,
-        date: new Date().toLocaleDateString(),
-        time: time,
-        reading: reading,
-        offset: "0",
-        status: status,
-        airGaugeId: g.id,
-        channel: "1",
-        drawing: "025.0050",
-        userId: g.uid,
-        componentId: "sridharrao"
-      });
-
-      if (status === 'REJECTED' || status === 'REWORK') {
-         mockAlerts.push({
-            id: `mock-alert-${i}`,
-            machine: g.gauge,
-            time: time,
-            part_no: "025.0050",
-            value: reading + " mm",
-            limit: "20.012 - 20.022 mm",
-            operator: g.uid,
-            reason: status === 'REJECTED' ? "Out of Tolerance" : "Warning Level",
-            status: status
-         });
-      }
-    }
-
-    try {
-      const existingAlerts = JSON.parse(localStorage.getItem('recent_alerts') || '[]');
-      // To avoid infinite mock growth on refresh, if we only have mocks we just replace them
-      const isOnlyMocks = existingAlerts.every(a => a.id.toString().startsWith('mock-'));
-      if (isOnlyMocks) {
-        localStorage.setItem('recent_alerts', JSON.stringify(mockAlerts.slice(0, 50)));
-      } else {
-        const combined = [...existingAlerts, ...mockAlerts].slice(0, 50);
-        localStorage.setItem('recent_alerts', JSON.stringify(combined));
-      }
-    } catch(e) {}
-
-    return mockData;
-  });
-
+  const [monitoringData, setMonitoringData] = useState([]);
   const [readingBuffers, setReadingBuffers] = useState({});
-  const [allSpcMetrics, setAllSpcMetrics] = useState(() => {
-    const allReadings = monitoringData.map(r => parseFloat(r.reading)).reverse();
-    // Use the mock limits that match our mock data
-    const metrics = calculateSPC(allReadings, 20.012, 20.022);
-    return { 'ALL': metrics, 'AG01': metrics, 'AG02': metrics };
-  });
+  const [allSpcMetrics, setAllSpcMetrics] = useState({});
   const [operatorNameMap, setOperatorNameMap] = useState({});
 
   useEffect(() => {
@@ -86,22 +22,13 @@ export default function LiveMonitoring() {
     savedUsers.forEach(u => {
       if (u.userId) mapping[u.userId] = u.operatorName;
     });
-    // Hardcode user IDs 111 and 222
-    mapping['111'] = 'aaa';
-    mapping['222'] = 'bbb';
     setOperatorNameMap(mapping);
     
     // Fetch ERP Data
     const apiHost = window.location.hostname;
     fetch(`http://${apiHost}:8005/api/erp/current-order`)
-      .then(res => {
-        if (!res.ok) throw new Error("Not Found");
-        return res.json();
-      })
-      .then(data => {
-        if (data.detail || !data.part_number) throw new Error("Invalid Data");
-        setErpData(data);
-      })
+      .then(res => res.json())
+      .then(data => setErpData(data))
       .catch(err => {
         console.error("ERP fetch error:", err);
         // Mock data for UI preview
@@ -116,87 +43,36 @@ export default function LiveMonitoring() {
   }, []);
 
   useEffect(() => {
-    // Keep buffers and SPC metrics intact when switching gauges
+    // Clear buffers when component mounts
+    setReadingBuffers({});
     setLiveReading(null);
+    setAllSpcMetrics({});
 
     const wsHost = window.location.hostname;
     const ws = new WebSocket(`ws://${wsHost}:8005/ws/live-data`);
 
     const processIncomingData = (data) => {
       if (data.type === "DISCONNECT") {
+        setMonitoringData([]);
         setLiveReading(null);
         return;
       }
 
       const incomingGaugeId = data.machine_id || "AG01";
 
-      const assignedOperator = localStorage.getItem(`assigned_operator_${incomingGaugeId}`);
-      if (incomingGaugeId === 'AG01' || incomingGaugeId === '1') {
-        data.operator = '111';
-        data.userId = '111';
-      } else if (incomingGaugeId === 'AG02' || incomingGaugeId === '2') {
-        data.operator = '222';
-        data.userId = '222';
-      } else if (assignedOperator) {
-        data.operator = assignedOperator;
-        data.userId = assignedOperator;
-      }
-
       if (currentGauge === "ALL" || incomingGaugeId === currentGauge) {
         setLiveReading(data);
-      }
-
-      // Save rejected items to localStorage for the Alerts page
-      const statusStr = (data.status || "").toUpperCase();
-      if (statusStr === "REJECTED" || statusStr === "REWORK") {
-        try {
-          const alertsList = JSON.parse(localStorage.getItem('recent_alerts') || '[]');
-          const newAlert = {
-            id: Date.now() + Math.random(),
-            machine: incomingGaugeId,
-            time: new Date().toLocaleTimeString(),
-            part_no: data.drawing || "Unknown",
-            value: parseFloat(data.reading).toFixed(4) + " mm",
-            limit: `${data.ltl ?? 20.012} - ${data.utl ?? 20.022} mm`,
-            operator: data.operator || "Unknown",
-            reason: statusStr === "REJECTED" ? "Out of Tolerance" : "Warning Level",
-            status: statusStr
-          };
-          const updatedAlerts = [newAlert, ...alertsList].slice(0, 50);
-          localStorage.setItem('recent_alerts', JSON.stringify(updatedAlerts));
-
-          // Automatically send WhatsApp notification
-          const apiHost = window.location.hostname;
-          fetch(`http://${apiHost}:8005/api/alerts/send-whatsapp`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              machine: newAlert.machine,
-              part_no: newAlert.part_no,
-              value: newAlert.value,
-              limit: newAlert.limit,
-              operator: newAlert.operator,
-              reason: newAlert.reason
-            })
-          }).catch(err => console.error("Auto WhatsApp Error:", err));
-
-        } catch (e) {
-          console.error("Failed to save alert", e);
-        }
       }
 
       const gaugeNum = parseInt(incomingGaugeId.replace("AG", ""));
       if (gaugeNum >= 1 && gaugeNum <= 10) {
         setReadingBuffers(prev => {
           const currentBuffer = prev[incomingGaugeId] || [];
-          const newBuffer = [parseFloat(data.reading), ...currentBuffer].slice(0, 50);
+          const newBuffer = [data.reading, ...currentBuffer].slice(0, 50);
           
           if (newBuffer.length >= 5) {
-            // Try to extract limits from the incoming data, fallback to 20.012 / 20.022
-            const ltl = data.ltl ?? data.lsl ?? data.lower_limit ?? 20.012;
-            const utl = data.utl ?? data.usl ?? data.upper_limit ?? 20.022;
-            const metrics = calculateSPC([...newBuffer].reverse(), parseFloat(ltl), parseFloat(utl));
-            setAllSpcMetrics(prevMetrics => ({ ...prevMetrics, [incomingGaugeId]: metrics, 'ALL': metrics }));
+            const metrics = calculateSPC([...newBuffer].reverse());
+            setAllSpcMetrics(prevMetrics => ({ ...prevMetrics, [incomingGaugeId]: metrics }));
           }
           
           return { ...prev, [incomingGaugeId]: newBuffer };
@@ -210,12 +86,12 @@ export default function LiveMonitoring() {
             reading: data.reading ? parseFloat(data.reading).toFixed(4) : "0.0000",
             offset: "0",
             status: data.status ? data.status.toUpperCase() : "ACCEPTED",
-            airGaugeId: data.airGaugeId || "3",
-            operator: data.operator || "567",
-            channel: data.channel || (Math.floor(Math.random() * 4) + 1).toString(),
-            drawing: data.drawing || "026.0050",
-            userId: data.userId || data.operator || "567",
-            componentId: data.componentId || "sridharrao"
+            airGaugeId: incomingGaugeId,
+            operator: data.operator || "admin",
+            channel: "1",
+            drawing: "DEF-202",
+            userId: data.operator || "admin",
+            componentId: "stream"
           };
           return [newData, ...prev].slice(0, 50);
         });
@@ -254,9 +130,6 @@ export default function LiveMonitoring() {
         </div>
       </div>
 
-
-
-
       {/* ERP Context Card */}
       <div className="w-full bg-[#f8fafc] border border-gray-200 rounded-xl p-4 shadow-sm mb-4">
         <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
@@ -282,11 +155,11 @@ export default function LiveMonitoring() {
       </div>
 
       {/* Big Live Value Display */}
-      <div className={`relative w-full bg-white rounded-xl shadow-sm border ${liveReading?.status?.toUpperCase() === 'REJECTED' ? 'border-[#b91c1c]' : liveReading?.status?.toUpperCase() === 'REWORK' ? 'border-[#ea580c]' : 'border-[#15803d]'} mb-4 p-6 text-center`}>
-        <div className={`absolute left-0 top-0 w-1.5 h-full ${liveReading?.status?.toUpperCase() === 'REJECTED' ? 'bg-[#b91c1c]' : liveReading?.status?.toUpperCase() === 'REWORK' ? 'bg-[#ea580c]' : 'bg-[#15803d]'} rounded-l-xl`}></div>
+      <div className="w-full bg-white border border-[#bbf7d0] rounded-xl p-6 shadow-sm mb-4 text-center relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-[#15803d]"></div>
         
         <div className="flex justify-between items-center mb-2 px-2">
-            <h2 className={`text-xs font-bold uppercase tracking-wide ${liveReading?.status?.toUpperCase() === 'REJECTED' ? 'text-[#b91c1c]' : liveReading?.status?.toUpperCase() === 'REWORK' ? 'text-[#ea580c]' : 'text-[#15803d]'}`}>Air Gauge Current Reading</h2>
+            <h2 className="text-xs font-bold text-[#15803d] uppercase tracking-wide">Air Gauge Current Reading</h2>
             <div className="text-[10px] text-gray-500 font-semibold bg-gray-50 px-2 py-1 rounded border border-gray-100 flex items-center gap-1">
                Air Gauge: 
                <select 
@@ -299,15 +172,17 @@ export default function LiveMonitoring() {
                    <option key={ag} value={ag}>{ag}</option>
                  ))}
                </select> 
-
+               <span className="ml-1">| Employee: <span className="text-black font-bold">
+                 {currentGauge === 'ALL' ? 'Multiple' : liveReading?.operator ? `${liveReading.operator} ${operatorNameMap[liveReading.operator] ? `(${operatorNameMap[liveReading.operator]})` : ''}` : 'Wait...'}
+               </span></span>
             </div>
         </div>
 
-        <div className={`text-4xl font-black ${liveReading?.status?.toUpperCase() === 'REJECTED' ? 'text-[#b91c1c]' : liveReading?.status?.toUpperCase() === 'REWORK' ? 'text-[#ea580c]' : 'text-[#15803d]'} font-mono tracking-tight`}>
+        <div className="text-4xl font-black text-[#15803d] font-mono tracking-tight">
           {liveReading ? `${parseFloat(liveReading.reading).toFixed(4)} mm` : '--.---- mm'}
         </div>
         <div className="flex justify-center items-center gap-2 mt-2">
-          <div className={`text-xs font-bold px-2 py-1 rounded ${liveReading?.status?.toUpperCase() === 'REJECTED' ? 'bg-[#fef2f2] text-[#b91c1c]' : liveReading?.status?.toUpperCase() === 'REWORK' ? 'bg-[#fff7ed] text-[#ea580c]' : 'bg-[#f0fdf4] text-[#15803d]'}`}>
+          <div className={`text-xs font-bold px-2 py-1 rounded ${liveReading?.status === 'Rejected' ? 'bg-[#fef2f2] text-[#b91c1c]' : liveReading?.status === 'Rework' ? 'bg-[#fff7ed] text-[#ea580c]' : 'bg-[#f0fdf4] text-[#15803d]'}`}>
             {liveReading?.status || 'Waiting for stream...'}
           </div>
           <div className="text-xs font-bold px-2 py-1 rounded bg-[#fff7ed] border border-[#fed7aa] text-[#ea580c] shadow-sm">
@@ -315,6 +190,7 @@ export default function LiveMonitoring() {
           </div>
         </div>
       </div>
+
 
       {/* Data Table */}
       <div className="w-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4">
@@ -330,8 +206,7 @@ export default function LiveMonitoring() {
                 <th className="px-2 py-2 font-bold whitespace-nowrap border border-gray-200 text-gray-800"><div className="flex items-center gap-1.5"><Tag className="w-3.5 h-3.5 text-[#15803d]" /> AirGauge ID</div></th>
                 <th className="px-2 py-2 font-bold whitespace-nowrap border border-gray-200 text-gray-800"><div className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-[#15803d]" /> Channel</div></th>
                 <th className="px-2 py-2 font-bold whitespace-nowrap border border-gray-200 text-gray-800"><div className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-[#15803d]" /> Drawing</div></th>
-                <th className="px-2 py-2 font-bold whitespace-nowrap border border-gray-200 text-gray-800"><div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-[#15803d]" /> Employee ID</div></th>
-                <th className="px-2 py-2 font-bold whitespace-nowrap border border-gray-200 text-gray-800"><div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-[#15803d]" /> Employee Name</div></th>
+                <th className="px-2 py-2 font-bold whitespace-nowrap border border-gray-200 text-gray-800"><div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-[#15803d]" /> User ID</div></th>
                 <th className="px-2 py-2 font-bold whitespace-nowrap border border-gray-200 text-gray-800"><div className="flex items-center gap-1.5"><Settings className="w-3.5 h-3.5 text-[#15803d]" /> Component ID</div></th>
               </tr>
             </thead>
@@ -342,19 +217,20 @@ export default function LiveMonitoring() {
                 </tr>
               ) : (
                 monitoringData.map((row, index) => (
-                  <tr key={index} className={`transition-colors ${row.status?.toUpperCase() === 'ACCEPTED' ? 'bg-[#f0fdf4] hover:bg-[#dcfce7]' : row.status?.toUpperCase() === 'REJECTED' ? 'bg-[#fef2f2] hover:bg-[#fee2e2]' : row.status?.toUpperCase() === 'REWORK' ? 'bg-[#fff7ed] hover:bg-[#ffedd5]' : 'hover:bg-gray-100 even:bg-gray-50'}`}>
+                  <tr key={index} className="hover:bg-gray-100 transition-colors even:bg-gray-50">
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.date}</td>
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.time}</td>
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.reading}</td>
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.offset}</td>
-                    <td className={`px-2 py-2 border border-gray-200 font-bold whitespace-nowrap ${row.status?.toUpperCase() === 'ACCEPTED' ? 'text-[#15803d]' : row.status?.toUpperCase() === 'REJECTED' ? 'text-[#b91c1c]' : row.status?.toUpperCase() === 'REWORK' ? 'text-[#ea580c]' : 'text-gray-800'}`}>
+                    <td className={`px-2 py-2 border border-gray-200 font-medium whitespace-nowrap text-gray-800`}>
                       {row.status}
                     </td>
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.airGaugeId}</td>
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.channel || '1'}</td>
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.drawing}</td>
-                    <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.userId}</td>
-                    <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{operatorNameMap[row.userId] || 'Unknown'}</td>
+                    <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">
+                      {row.userId} {operatorNameMap[row.userId] ? `(${operatorNameMap[row.userId]})` : ''}
+                    </td>
                     <td className="px-2 py-2 text-gray-800 border border-gray-200 font-medium whitespace-nowrap">{row.componentId}</td>
                   </tr>
                 ))

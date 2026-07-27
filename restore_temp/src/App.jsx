@@ -18,7 +18,6 @@ import FactoryOverview from './pages/FactoryOverview';
 import MachineDetail from './pages/MachineDetail';
 import UserManagement from './pages/UserManagement';
 import Settings from './pages/Settings';
-import CustomerSetup from './pages/CustomerSetup';
 
 import ForgotPassword from './pages/ForgotPassword';
 
@@ -47,7 +46,6 @@ export default function App() {
             <Route path="machine/:id" element={<MachineDetail />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="customer" element={<CustomerSetup />} />
           </Route>
           
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,10 +1,5 @@
 import os
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-import asyncio
-import time
-import json
-import paho.mqtt.client as mqtt
-from typing import List
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -165,149 +160,10 @@ def trigger_twilio_sms(reading_value: float):
     except Exception as e:
         print(f"Twilio SMS Error: {str(e)}")
 
-class WhatsAppAlertRequest(BaseModel):
-    machine: str
-    part_no: str
-    value: str
-    limit: str
-    operator: str
-    reason: str
-
-@app.post("/api/alerts/send-whatsapp")
-def send_whatsapp_alert(req: WhatsAppAlertRequest):
-    tw_sid = os.getenv("TWILIO_ACCOUNT_SID")
-    tw_token = os.getenv("TWILIO_AUTH_TOKEN")
-    tw_from = os.getenv("TWILIO_PHONE_NUMBER")
-    
-    if not tw_sid or not tw_token or not tw_from:
-        raise HTTPException(status_code=500, detail="Twilio credentials missing in .env file")
-        
-    # Ensure from_number has whatsapp: prefix
-    if not tw_from.startswith("whatsapp:"):
-        tw_from = f"whatsapp:{tw_from}"
-        
-    # As requested: From 9364502659 to 9688172434, 7867846661, 7418063486
-    # Twilio will use the TWILIO_PHONE_NUMBER env var for 'from', but we enforce targets here
-    target_numbers = ["+919688172434", "+917867846661", "+917418063486"]
-    
-    try:
-        client = Client(tw_sid, tw_token)
-        
-        message_body = (
-            f"🚨 *REJECTION ALERT* 🚨\n\n"
-            f"Machine: {req.machine}\n"
-            f"Part No: {req.part_no}\n"
-            f"Value: {req.value}\n"
-            f"Limit: {req.limit}\n"
-            f"Operator: {req.operator}\n"
-            f"Reason: {req.reason}"
-        )
-
-        responses = []
-        for number in target_numbers:
-            # Ensure to_number has whatsapp: prefix
-            to_number = f"whatsapp:{number}" if not number.startswith("whatsapp:") else number
-            msg = client.messages.create(
-                body=message_body,
-                from_=tw_from,
-                to=to_number
-            )
-            responses.append(msg.sid)
-            
-        return {"status": "success", "message_sids": responses}
-    except Exception as e:
-        print(f"Twilio WhatsApp Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except Exception:
-                pass
-
-manager = ConnectionManager()
-
-@app.websocket("/ws/live-data")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-last_data_time = 0
-loop = None
-
-def on_mqtt_message(client, userdata, msg):
-    global last_data_time
-    try:
-        payload = msg.payload.decode("utf-8")
-        data = json.loads(payload)
-        
-        # Keep track of when data was last received
-        last_data_time = time.time()
-        global latest_live_reading
-        latest_live_reading = data
-        
-        # Broadcast to websockets
-        if loop and not loop.is_closed():
-            asyncio.run_coroutine_threadsafe(manager.broadcast(data), loop)
-    except Exception as e:
-        print("MQTT Error:", e)
-
-def start_mqtt_client():
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "FastAPI_Backend_Subscriber")
-    client.on_message = on_mqtt_message
-    try:
-        client.connect("127.0.0.1", 1883, 60)
-        client.subscribe("testtopic/#")
-        client.loop_start()
-    except Exception as e:
-        print("Could not connect to MQTT:", e)
-
-@app.on_event("startup")
-async def startup_event():
-    global loop
-    loop = asyncio.get_running_loop()
-    
-    # Start MQTT background thread
-    start_mqtt_client()
-    
-    async def check_timeout():
-        global last_data_time
-        while True:
-            await asyncio.sleep(2)
-            if last_data_time > 0 and time.time() - last_data_time > 3:
-                await manager.broadcast({"type": "DISCONNECT"})
-                last_data_time = 0 # reset to prevent spamming
-    asyncio.create_task(check_timeout())
-
 @app.post("/api/data/upload")
-async def upload_live_data(data: dict):
-    print("RECV:", data)
-    global latest_live_reading, last_data_time
+def upload_live_data(data: dict):
+    global latest_live_reading
     latest_live_reading = data
-    last_data_time = time.time()
-    
-    if data.get("status") == "DISCONNECTED" or data.get("type") == "DISCONNECT":
-        await manager.broadcast({"type": "DISCONNECT"})
-    else:
-        await manager.broadcast(data)
-        
     return {"status": "success", "message": "Data received"}
 
 # 2. LIVE DATA ENDPOINT (Specific to an Air Gauge)

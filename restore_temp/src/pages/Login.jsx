@@ -84,7 +84,17 @@ export default function Login() {
             </div>
           </div>
 
-
+          {/* Added Phone Number Field fixed to India */}
+          <div className="flex gap-2 w-full">
+            <div className="w-[80px] py-3.5 px-2 border border-gray-300 rounded-lg text-black bg-gray-100 flex items-center justify-center font-bold">
+              +91
+            </div>
+            <input 
+              type="tel" 
+              placeholder="Phone Number"
+              className="flex-1 px-4 py-3.5 border border-gray-300 rounded-lg text-black focus:outline-none focus:border-gray-400" 
+            />
+          </div>
 
           <div className="flex justify-end w-full">
             <button type="button" onClick={() => navigate('/forgot-password')} className="text-xs font-medium text-[#15803d] hover:underline">Forgot Password?</button>

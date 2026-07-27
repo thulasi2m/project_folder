@@ -3,9 +3,9 @@ import { User, Shield } from 'lucide-react';
 import workerImg from '../assets/worker.png';
 
 export default function UserManagement() {
-  const [userId, setUserId] = useState("");
-  const [operatorName, setOperatorName] = useState("");
-  const [username, setUsername] = useState("");
+  const [userId, setUserId] = useState("UID-9901");
+  const [operatorName, setOperatorName] = useState("John Doe");
+  const [username, setUsername] = useState("johndoe_op");
   const [profileImage, setProfileImage] = useState(null);
 
   const handleSave = () => {

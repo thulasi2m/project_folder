@@ -44,8 +44,7 @@ const ChartBlock = ({ onAdd }) => {
   const [chartData, setChartData] = useState([]);
   
   useEffect(() => {
-    // Generate exact initial mock data matching the original screenshot
-    const initialPoints = [];
+    const points = [];
     for (let i = 0; i < 15; i++) {
       const x = 1664 + i * 2; 
       const range = limits.upper - limits.target;
@@ -56,107 +55,37 @@ const ChartBlock = ({ onAdd }) => {
       const isWarning = !isReject && ((val > limits.upper - 0.005 && val <= limits.upper) || (val < limits.lower + 0.005 && val >= limits.lower));
       
       let statusColor = "Green";
-      let displayStatus = "Accepted";
-      if (isReject) {
-        statusColor = "Red";
-        displayStatus = "Rejected";
-      }
-      else if (isWarning) {
-        statusColor = "Yellow";
-        displayStatus = "Rework";
-      }
+      if (isReject) statusColor = "Red";
+      else if (isWarning) statusColor = "Yellow";
 
-      initialPoints.push({ 
+      points.push({ 
         index: x, 
         value: val,
         statusColor: statusColor,
-        displayStatus: displayStatus,
         employeeId: `EMP${Math.floor(Math.random() * 900 + 100)}`,
+        accepted: Math.floor(Math.random() * 50 + 100),
+        rejected: isReject ? Math.floor(Math.random() * 5 + 1) : 0,
+        rework: isWarning ? Math.floor(Math.random() * 3 + 1) : 0,
         cpc: (1.2 + Math.random() * 0.5).toFixed(2),
         time: new Date(Date.now() - (15 - i) * 60000).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }) + " IST",
         alert: isReject ? "Out of Control" : isWarning ? "Approaching Limit" : "None"
       });
     }
-    setChartData(initialPoints);
-    
-    const wsHost = window.location.hostname;
-    const ws = new WebSocket(`ws://${wsHost}:8005/ws/live-data`);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "DISCONNECT") return;
-        
-        const incomingGaugeId = data.machine_id || "AG01";
-        const targetGauge = selectedGauge.replace('AG', 'AG0'); // normalizes AG1 to AG01
-        
-        if (incomingGaugeId === targetGauge || targetGauge.includes(incomingGaugeId.replace('AG0', 'AG'))) {
-          const val = parseFloat(data.reading);
-          if (isNaN(val)) return;
-
-          // Dynamically update limits if the machine provides them
-          const ltl = parseFloat(data.ltl ?? data.lsl ?? data.lower_limit);
-          const utl = parseFloat(data.utl ?? data.usl ?? data.upper_limit);
-          const target = parseFloat(data.target ?? data.nominal);
-          if (!isNaN(ltl) && !isNaN(utl)) {
-            setLimits({
-              target: isNaN(target) ? (ltl + utl) / 2 : target,
-              lower: ltl,
-              upper: utl
-            });
-          }
-
-          const rawStatus = (data.status || "ACCEPTED").toUpperCase();
-          
-          let statusColor = "Green";
-          let alertText = "None";
-          let displayStatus = "Accepted";
-          
-          if (rawStatus === "REJECTED") {
-            statusColor = "Red";
-            alertText = "Out of Control";
-            displayStatus = "Rejected";
-          } else if (rawStatus === "REWORK") {
-            statusColor = "Yellow";
-            alertText = "Needs Rework";
-            displayStatus = "Rework";
-          }
-
-          setChartData(prev => {
-            const newPoint = {
-              index: prev.length > 0 ? prev[prev.length - 1].index + 1 : 1,
-              value: val,
-              statusColor: statusColor,
-              displayStatus: displayStatus,
-              employeeId: data.operator || 'Unknown',
-              time: new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit" }) + " IST",
-              alert: alertText
-            };
-            return [...prev, newPoint].slice(-30); // Keep last 30 readings on chart
-          });
-        }
-      } catch (err) {
-        console.error("Run Chart WS Error:", err);
-      }
-    };
-
-    return () => {
-      ws.close();
-    };
+    setChartData(points);
   }, [selectedGauge, limits]);
 
   const dataMin = chartData.length > 0 ? Math.min(...chartData.map(d => d.value)) : 0;
   const dataMax = chartData.length > 0 ? Math.max(...chartData.map(d => d.value)) : 0;
 
-  const yDomainMin = limits.lower - Math.abs(limits.target - limits.lower) * 0.5;
-  const yDomainMax = limits.upper + Math.abs(limits.upper - limits.target) * 0.5;
+  const yDomainMin = Math.min(limits.lower - Math.abs(limits.target - limits.lower) * 0.5, dataMin);
+  const yDomainMax = Math.max(limits.upper + Math.abs(limits.upper - limits.target) * 0.5, dataMax);
 
   const dataRange = dataMax - dataMin;
   const offsetTop = dataRange > 0 ? Math.max(0, Math.min(1, (dataMax - limits.upper) / dataRange)) : 0;
   const offsetBottom = dataRange > 0 ? Math.max(0, Math.min(1, (dataMax - limits.lower) / dataRange)) : 1;
 
-  const topZoneColor = type === 'Shaft' ? '#dc2626' : '#d97706'; 
-  const bottomZoneColor = type === 'Shaft' ? '#d97706' : '#dc2626';
+  const topZoneColor = type === 'Shaft' ? '#d97706' : '#dc2626'; 
+  const bottomZoneColor = type === 'Shaft' ? '#dc2626' : '#d97706';
 
   const renderCustomDot = (props) => {
     const { cx, cy, payload } = props;
@@ -185,22 +114,22 @@ const ChartBlock = ({ onAdd }) => {
       if (data.value > limits.upper) dotColor = topZoneColor; 
       else if (data.value < limits.lower) dotColor = bottomZoneColor; 
 
-      let bgColor = "bg-green-600";
-      let borderColor = "border-green-800";
-      let textColor = "text-green-100";
-      let dividerColor = "border-green-500";
+      let bgColor = "bg-[#15803d]"; 
+      let borderColor = "border-black border-2"; // ALWAYS BLACK BORDER
+      let textColor = "text-green-200";
+      let dividerColor = "border-green-600";
+      let statusLabel = "Accepted";
       
-      const statusLabel = data.displayStatus || "Accepted";
-      if (statusLabel === 'Rejected') {
-        bgColor = "bg-red-600";
-        borderColor = "border-red-800";
-        textColor = "text-red-100";
-        dividerColor = "border-red-500";
-      } else if (statusLabel === 'Rework') {
-        bgColor = "bg-yellow-600";
-        borderColor = "border-yellow-800";
-        textColor = "text-yellow-100";
-        dividerColor = "border-yellow-500";
+      if (dotColor === '#dc2626') {
+        bgColor = "bg-red-700";
+        textColor = "text-red-200";
+        dividerColor = "border-red-600";
+        statusLabel = "Rejected";
+      } else if (dotColor === '#d97706') {
+        bgColor = "bg-[#b45309]"; 
+        textColor = "text-orange-200";
+        dividerColor = "border-orange-600";
+        statusLabel = "Rework";
       }
 
       return (
@@ -209,11 +138,11 @@ const ChartBlock = ({ onAdd }) => {
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
             <span className={textColor}>Status:</span> 
             <span className="font-bold text-white">{statusLabel}</span>
-            <span className={textColor}>Employee ID:</span> <span className="font-bold">{data.employeeId || 'Unknown'}</span>
-            <span className={textColor}>CPC Value:</span> <span className="font-bold">{data.cpc || '--'}</span>
+            <span className={textColor}>Employee ID:</span> <span className="font-bold">{data.employeeId || 'EMP314'}</span>
+            <span className={textColor}>CPC Value:</span> <span className="font-bold">{data.cpc || '1.34'}</span>
           </div>
           <p className="mt-1"><span className={textColor}>Last Updated:</span> <span className="font-bold">{data.time || new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) + ' IST'}</span></p>
-          <p><span className={textColor}>Alerts:</span> <span className="font-bold">{data.alert || "None"}</span></p>
+          <p><span className={textColor}>Alerts:</span> <span className="font-bold">{statusLabel === 'Rejected' ? 'Out of Control' : statusLabel === 'Rework' ? 'Needs Rework' : 'None'}</span></p>
         </div>
       );
     }
@@ -318,7 +247,7 @@ const ChartBlock = ({ onAdd }) => {
               </filter>
             </defs>
 
-            {/* Background Zones - Restored */}
+            {/* Background Zones - Dynamic Colors */}
             <ReferenceArea y1={limits.upper} y2={yDomainMax} fill={topZoneColor} fillOpacity={0.8} />
             <ReferenceArea y1={limits.lower} y2={limits.upper} fill="#e6f0eb" fillOpacity={1} />
             <ReferenceArea y1={yDomainMin} y2={limits.lower} fill={bottomZoneColor} fillOpacity={0.8} />
@@ -338,7 +267,6 @@ const ChartBlock = ({ onAdd }) => {
               tick={{ fontSize: 10, fill: '#374151', fontWeight: 'bold' }} 
               axisLine={{stroke: '#9ca3af'}}
               tickLine={{stroke: '#9ca3af'}}
-              allowDataOverflow={true}
             />
             
             <YAxis 
@@ -349,7 +277,6 @@ const ChartBlock = ({ onAdd }) => {
               axisLine={{stroke: '#9ca3af'}}
               tickLine={{stroke: '#9ca3af'}}
               tickFormatter={(val) => val.toFixed(3)}
-              allowDataOverflow={true}
             />
 
             <Line 

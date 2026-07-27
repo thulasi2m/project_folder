@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f3f4f6; /* Gray background outside the mobile frame */
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  max-width: 430px; /* Strict mobile width */
+  min-height: 100vh;
+  background-color: #e5e5e5;
+  box-shadow: 0 0 40px rgba(0,0,0,0.2);
+  position: relative;
+  overflow-x: hidden;
+  /* Enforce 9:16 aspect ratio feel by limiting height on very large monitors if needed, but min-height 100vh is usually fine for a realistic mobile feel on desktop */
+}

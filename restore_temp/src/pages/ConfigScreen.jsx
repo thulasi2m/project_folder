@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Bell, PieChart as PieChartIcon, User, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { Settings, Bell, PieChart as PieChartIcon } from 'lucide-react';
 
 import bgImage from '../assets/machinesetup.png';
 import logoImage from '../assets/cherry_full_logo.png';
@@ -11,101 +11,9 @@ export default function ConfigScreen() {
     const saved = localStorage.getItem('numGauges');
     return saved ? parseInt(saved) : 10;
   });
-  const [savedUsers, setSavedUsers] = useState([]);
-  
-  const [operatorId, setOperatorId] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [assignGauge, setAssignGauge] = useState("AG01");
-
-  const handleAddOperator = () => {
-    if (!operatorId || !name) {
-      alert("Operator ID and Name are required!");
-      return;
-    }
-    const existingUsers = JSON.parse(localStorage.getItem('savedUsers') || '[]');
-    const filteredUsers = existingUsers.filter(u => u.userId !== operatorId);
-    
-    const newUser = { userId: operatorId, operatorName: name, phone, date: new Date().toLocaleDateString() };
-    const updatedUsers = [newUser, ...filteredUsers];
-    localStorage.setItem('savedUsers', JSON.stringify(updatedUsers));
-    
-    if (assignGauge) {
-      localStorage.setItem(`assigned_operator_${assignGauge}`, operatorId);
-    }
-    
-    // Deduplicate state
-    const uniqueUsers = [];
-    const seen = new Set();
-    for (const u of updatedUsers) {
-      if (!seen.has(u.userId)) {
-        seen.add(u.userId);
-        uniqueUsers.push(u);
-      }
-    }
-    setSavedUsers(uniqueUsers);
-    
-    setSuccessMsg("Operator added!");
-    setTimeout(() => setSuccessMsg(""), 2000);
-    
-    setOperatorId("");
-    setName("");
-    setPhone("");
-  };
-
-  const handleDelete = () => {
-    if (!operatorId) {
-      alert("Please enter the Operator ID to delete.");
-      return;
-    }
-    const existingUsers = JSON.parse(localStorage.getItem('savedUsers') || '[]');
-    const filteredUsers = existingUsers.filter(u => u.userId !== operatorId);
-    
-    if (existingUsers.length === filteredUsers.length) {
-      alert("Operator ID not found.");
-      return;
-    }
-
-    localStorage.setItem('savedUsers', JSON.stringify(filteredUsers));
-    
-    // Deduplicate state
-    const uniqueUsers = [];
-    const seen = new Set();
-    for (const u of filteredUsers) {
-      if (!seen.has(u.userId)) {
-        seen.add(u.userId);
-        uniqueUsers.push(u);
-      }
-    }
-    setSavedUsers(uniqueUsers);
-    
-    setSuccessMsg("Operator deleted!");
-    setTimeout(() => setSuccessMsg(""), 2000);
-    
-    setOperatorId("");
-    setName("");
-    setPhone("");
-  };
 
   useEffect(() => {
     localStorage.setItem('numGauges', numGauges);
-    let loadedUsers = JSON.parse(localStorage.getItem('savedUsers') || '[]');
-    
-    // Remove the UID-9901 dummy data
-    loadedUsers = loadedUsers.filter(u => u.userId !== 'UID-9901');
-    localStorage.setItem('savedUsers', JSON.stringify(loadedUsers));
-    
-    // Deduplicate users by userId
-    const uniqueUsers = [];
-    const seen = new Set();
-    for (const u of loadedUsers) {
-      if (!seen.has(u.userId)) {
-        seen.add(u.userId);
-        uniqueUsers.push(u);
-      }
-    }
-    setSavedUsers(uniqueUsers);
   }, [numGauges]);
   const [utl, setUtl] = useState("10.050");
   const [ltl, setLtl] = useState("10.000");
@@ -236,56 +144,68 @@ export default function ConfigScreen() {
             </div>
             
             {openEmployeeMaster && (
-              <div className="flex flex-col gap-3 mt-1 p-2 bg-gray-50 border border-gray-200 rounded-xl shadow-inner max-h-[400px] overflow-y-auto">
-                
-                {/* Form to add/delete employee */}
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 w-full flex flex-col relative">
-                  {successMsg && (
-                    <div className="absolute inset-0 bg-white/90 z-10 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm">
-                      <CheckCircle className="w-8 h-8 text-[#15803d] mb-1" />
-                      <p className="font-bold text-[#15803d] text-sm">{successMsg}</p>
+              <div className="flex flex-col gap-3 mt-1 p-2 bg-gray-50 border border-gray-200 rounded-xl shadow-inner max-h-[300px] overflow-y-auto">
+                {Array.from({ length: numGauges }, (_, i) => i + 1).map((gaugeNum) => {
+                  return (
+                    <div key={gaugeNum} className="bg-white border border-gray-200 rounded-xl flex flex-col shadow-sm p-3">
+                      <div className="text-xs font-bold text-[#15803d] uppercase tracking-wider mb-2">AG {gaugeNum} Employee</div>
+                      <select 
+                         className="w-full p-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-[#15803d]"
+                         onChange={(e) => {
+                           const stored = JSON.parse(localStorage.getItem('gaugeEmployees') || '{}');
+                           stored[gaugeNum] = e.target.value;
+                           localStorage.setItem('gaugeEmployees', JSON.stringify(stored));
+                         }}
+                         defaultValue={JSON.parse(localStorage.getItem('gaugeEmployees') || '{}')[gaugeNum] || ""}
+                      >
+                        <option value="">Select Employee</option>
+                        <option value="EMP001 - John Doe">EMP001 - John Doe</option>
+                        <option value="EMP002 - Jane Smith">EMP002 - Jane Smith</option>
+                        <option value="EMP003 - Mike Johnson">EMP003 - Mike Johnson</option>
+                        <option value="EMP004 - Sarah Williams">EMP004 - Sarah Williams</option>
+                        <option value="EMP005 - Michael Brown">EMP005 - Michael Brown</option>
+                      </select>
+                      
+                      <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase">Select Shift</span>
+                        <div className="flex gap-2">
+                          {[1, 2, 3].map(shift => {
+                            const storedRaw = JSON.parse(localStorage.getItem('gaugeShifts') || '{}')[gaugeNum];
+                            const currentShifts = Array.isArray(storedRaw) ? storedRaw : (storedRaw ? [storedRaw] : []);
+                            const isSelected = currentShifts.includes(shift);
+                            
+                            return (
+                              <button 
+                                key={shift}
+                                type="button"
+                                onClick={() => {
+                                   const stored = JSON.parse(localStorage.getItem('gaugeShifts') || '{}');
+                                   const current = Array.isArray(stored[gaugeNum]) ? stored[gaugeNum] : (stored[gaugeNum] ? [stored[gaugeNum]] : []);
+                                   
+                                   if (current.includes(shift)) {
+                                     stored[gaugeNum] = current.filter(s => s !== shift);
+                                   } else {
+                                     stored[gaugeNum] = [...current, shift].sort();
+                                   }
+                                   
+                                   localStorage.setItem('gaugeShifts', JSON.stringify(stored));
+                                   setUpdateTrigger(prev => prev + 1);
+                                }}
+                                className={`w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                                  isSelected
+                                    ? 'bg-[#15803d] text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                              >
+                                {shift}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col">
-                      <label className="text-xs font-bold text-gray-800 mb-1">Employee ID:</label>
-                      <input 
-                        type="text" 
-                        value={operatorId}
-                        onChange={(e) => setOperatorId(e.target.value)}
-                        className="w-full px-2 py-1.5 border-2 border-[#15803d] rounded text-black bg-white focus:outline-none shadow-inner" 
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="text-xs font-bold text-gray-800 mb-1">Name:</label>
-                      <input 
-                        type="text" 
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full px-2 py-1.5 border-2 border-[#15803d] rounded text-black bg-white focus:outline-none shadow-inner" 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-4">
-                    <button 
-                      onClick={handleAddOperator} 
-                      className="flex-1 bg-[#065f46] text-white text-xs font-bold py-2 rounded flex items-center justify-center gap-1 hover:bg-[#047857] shadow-sm"
-                    >
-                      <Plus className="w-3.5 h-3.5 stroke-[3]" /> Add Operator
-                    </button>
-                    <button 
-                      onClick={handleDelete} 
-                      className="flex-1 bg-[#991b1b] text-white text-xs font-bold py-2 rounded flex items-center justify-center gap-1 hover:bg-[#7f1d1d] shadow-sm"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
-                    </button>
-                  </div>
-                </div>
-                <div className="w-full h-px bg-gray-200 my-1"></div>
-
-
+                  );
+                })}
               </div>
             )}
           </div>
